@@ -2,6 +2,8 @@ var express = require('express');
 var util = require('./lib/utility');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
+var bcrypt = require('bcrypt-nodejs');
+var Promise = require('bluebird');
 
 
 var db = require('./app/config');
@@ -22,11 +24,14 @@ app.use(bodyParser.json());
 // Parse forms (signup/login)
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
+
 app.use(session({
   secret: 'shortly',
   resave: false,
   saveUninitialized: true
 }));
+
+
 //if there is a session
 //if(req.session){
 
@@ -35,6 +40,9 @@ app.use(session({
 //}
 app.get('/', 
 function(req, res) {
+  console.log(req.session);
+  req.session.allan = 'hi'
+  console.log(req.session.allan, 'cookie');
   res.redirect('login');
   // res.render('index');
 });
@@ -126,20 +134,31 @@ app.post('/signup', function(req, res){
 app.post('/login', function(req, res){
   var username = req.body.username;
   var password = req.body.password;
-  new User({username: username, password: password}).fetch().then(function(exists){
-    if(exists){
+  
+  new User({username: username}).fetch().then(function(user){
+    if(user){
       //make a session
-      req.session.regenerate(function(error){
-        if (error) {
-          console.log('error', error);
-        } 
-        res.redirect('/');
+      var hashpw = user.get('password');
+      console.log(hashpw, 'this should be hashed');
+      bcrypt.compare(password, user.get('password'), function(err, response){
+        if(response){
+          req.session.regenerate(function(error){
+            if (error) {
+              console.log('error', error);
+            } 
+            res.redirect('/');
+          });
+        //password did not match  
+        } else {
+          res.redirect('/login');
+        }
       });
       
     } else {
       res.redirect('/login');
     }
   });
+
 });
 /************************************************************/
 // Handle the wildcard route last - if all other routes fail
